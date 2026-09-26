@@ -4,29 +4,31 @@
   var sb = window.supabase.createClient(SB_URL, SB_ANON);
   var HOME = "dvoe-home-v4";
   var DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-  var user = null, tab = "home", authMode = "choose", notice = "", showPass = false;
+  var DAYFULL = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+  var MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+  var user = null, tab = "home", authMode = "choose", notice = "", showPass = false, showBody = false;
   var weekStart = mondayOf(new Date());
   var menuDay = iso(new Date());
   function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function mondayOf(d) { var x = new Date(d); x.setHours(0,0,0,0); var day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return x; }
   function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function fmtLong(d) { return DAYFULL[d.getDay()] + ", " + d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear(); }
+  function weekLabel(start) {
+    var end = addDays(start, 6);
+    return start.getDate() + " " + MONTHS[start.getMonth()] + " — " + end.getDate() + " " + MONTHS[end.getMonth()] + " " + end.getFullYear();
+  }
   function makeCode() { return "ДВОЕ-" + Math.random().toString(36).slice(2, 6).toUpperCase(); }
   function seedHome() {
     var mon = mondayOf(new Date());
     function d(n) { return iso(addDays(mon, n)); }
     return {
       homeName: "Двое", inviteCode: makeCode(),
-      events: [{ title: "Забрать Авито", date: "2026-09-21", time: "18:00" }, { title: "Ужин с родителями", date: d(2), time: "19:00" }, { title: "Продукты", date: d(5), time: "12:00" }],
-      parcels: [{ id: "avito1", source: "Авито", title: "70000000518187074", status: "done", pickupCode: "в приложении Авито", address: "ПВЗ Авито" }, { id: "five1", source: "5Post", title: "I-275035137", status: "pickup", pickupCode: "913423120", address: "СПб, Доблести 9с1" }],
+      events: [{ title: "Забрать Авито", date: "2026-09-21", time: "18:00" }, { title: "Ужин с родителями", date: d(2), time: "19:00" }],
+      parcels: [{ id: "avito1", source: "Авито", title: "70000000518187074", status: "done", pickupCode: "в приложении Авито", address: "ПВЗ" }, { id: "five1", source: "5Post", title: "I-275035137", status: "pickup", pickupCode: "913423120", address: "Доблести 9с1" }],
       meals: [
-        { date: d(0), slot: "breakfast", title: "Овсянка с ягодой", kcal: 380, p: 18, f: 10, c: 52, eaten: true },
-        { date: d(0), slot: "lunch", title: "Курица и гречка", kcal: 610, p: 48, f: 16, c: 62, eaten: true },
-        { date: d(0), slot: "dinner", title: "Рыба и салат", kcal: 470, p: 36, f: 18, c: 22, eaten: false },
-        { date: d(1), slot: "breakfast", title: "Яйца и тост", kcal: 340, p: 22, f: 16, c: 24, eaten: false },
-        { date: d(1), slot: "lunch", title: "Борщ и хлеб", kcal: 520, p: 20, f: 18, c: 60, eaten: false },
-        { date: d(2), slot: "dinner", title: "Паста с томатами", kcal: 580, p: 22, f: 14, c: 84, eaten: false },
         { date: iso(new Date()), slot: "breakfast", title: "Омлет", kcal: 320, p: 24, f: 20, c: 8, eaten: true },
-        { date: iso(new Date()), slot: "lunch", title: "Гречка с индейкой", kcal: 590, p: 42, f: 14, c: 64, eaten: true }
+        { date: iso(new Date()), slot: "lunch", title: "Гречка с индейкой", kcal: 590, p: 42, f: 14, c: 64, eaten: true },
+        { date: d(0), slot: "dinner", title: "Рыба и салат", kcal: 470, p: 36, f: 18, c: 22, eaten: false }
       ]
     };
   }
@@ -42,7 +44,7 @@
     if (fat > 0 && fat < 70) bmr = 370 + 21.6 * (w * (1 - fat / 100));
     else if (h && age) bmr = p.sex === "male" ? 10 * w + 6.25 * h - 5 * age + 5 : 10 * w + 6.25 * h - 5 * age - 161;
     else return null;
-    var kcal = bmr * 1.375 * ({ maintain: 1, cut: 0.85, bulk: 1.1 }[p.goal] || 1);
+    var kcal = bmr * 1.375 * ({ maintain: 1, cut: 0.8, bulk: 1.15 }[p.goal] || 1);
     var lbm = fat ? w * (1 - fat / 100) : w;
     var pr = 1.8 * lbm, f = (kcal * 0.25) / 9, c = Math.max(0, (kcal - pr * 4 - f * 9) / 4);
     return { kcal: Math.round(kcal), p: Math.round(pr), f: Math.round(f), c: Math.round(c) };
@@ -61,17 +63,17 @@
     var p = 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"';
     if (name === "home") return '<svg viewBox="0 0 24 24" ' + p + '><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg>';
     if (name === "box") return '<svg viewBox="0 0 24 24" ' + p + '><path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5z"/><path d="M3 8.5V16l9 4.5 9-4.5V8.5"/></svg>';
-    if (name === "menu") return '<svg viewBox="0 0 24 24" ' + p + '><path d="M4 7h16M4 12h16M4 17h10"/></svg>';
+    if (name === "menu") return '<svg viewBox="0 0 24 24" ' + p + '><path d="M5 4v16"/><path d="M8 4c0 3-3 3-3 6"/><path d="M2 4c0 3 3 3 3 6"/><path d="M16 4h2a3 3 0 0 1 0 6h-2V20"/></svg>';
     return '<svg viewBox="0 0 24 24" ' + p + '><circle cx="12" cy="8" r="3.2"/><path d="M5 19.2c1.3-3 3.8-4.5 7-4.5s5.7 1.5 7 4.5"/></svg>';
   }
   function weekHTML() {
     var days = [0,1,2,3,4,5,6].map(function (i) { return addDays(weekStart, i); });
     var today = iso(new Date());
-    var html = '<div class="between"><h2 class="serif h2">Неделя</h2><div class="row"><button class="btn ghost" data-act="week" data-n="-7">назад</button><button class="btn ghost" data-act="week" data-n="7">вперёд</button></div></div>';
+    var html = '<div class="between"><div><h2 class="serif h2">Неделя</h2><p class="small">' + weekLabel(weekStart) + '</p></div><div class="row"><button class="btn ghost" data-act="week" data-n="-7">неделя назад</button><button class="btn ghost" data-act="week" data-n="7">неделя вперёд</button></div></div>';
     days.forEach(function (day, i) {
       var ds = iso(day);
       var items = home.events.filter(function (e) { return e.date === ds; });
-      html += '<div class="list-item"><strong>' + DAYS[i] + " " + day.getDate() + (ds === today ? " · сегодня" : "") + "</strong>";
+      html += '<div class="list-item"><strong>' + DAYS[i] + ", " + day.getDate() + " " + MONTHS[day.getMonth()] + (ds === today ? " · сегодня" : "") + "</strong>";
       if (!items.length) html += '<div class="small">свободно</div>';
       items.forEach(function (e) { html += "<div>" + esc(e.title) + "</div>"; });
       html += "</div>";
@@ -81,8 +83,8 @@
   }
   function menuHTML() {
     var days = [0,1,2,3,4,5,6].map(function (i) { return addDays(weekStart, i); });
-    var html = '<div class="between"><h1 class="serif h1">Меню</h1><div class="row"><button class="btn ghost" data-act="week" data-n="-7">нед −</button><button class="btn ghost" data-act="week" data-n="7">нед +</button></div></div>';
-    html += '<p class="lede">Общее на двоих. Листайте дни.</p><div class="days">';
+    var html = '<div class="between"><div><h1 class="serif h1">Меню</h1><p class="small">' + weekLabel(weekStart) + '</p></div><div class="row"><button class="btn ghost" data-act="week" data-n="-7">неделя назад</button><button class="btn ghost" data-act="week" data-n="7">неделя вперёд</button></div></div>';
+    html += '<p class="lede">Общее на двоих.</p><div class="days">';
     days.forEach(function (day, i) {
       var ds = iso(day);
       html += '<button class="daychip' + (ds === menuDay ? " on" : "") + '" data-act="menuday" data-d="' + ds + '">' + DAYS[i] + "<br>" + day.getDate() + "</button>";
@@ -101,7 +103,7 @@
   function authHTML() {
     var html = '<div class="app"><div class="hero"><div><div class="hero-kicker">дом на двоих</div><div class="hero-label serif">Двое</div></div></div><div class="main">';
     if (notice) html += '<div class="card"><p>' + esc(notice) + "</p></div>";
-    if (authMode === "choose") html += '<div class="card"><h1 class="serif h1">Вход</h1><p class="lede">Один создаёт дом, второй заходит по коду.</p><div class="row"><button class="btn accent" data-act="auth-reg">Создать дом</button><button class="btn ghost" data-act="auth-join">Есть код</button><button class="btn ghost" data-act="auth-login">Уже есть аккаунт</button></div></div>';
+    if (authMode === "choose") html += '<div class="card"><h1 class="serif h1">Вход</h1><div class="row"><button class="btn accent" data-act="auth-reg">Создать дом</button><button class="btn ghost" data-act="auth-join">Есть код</button><button class="btn ghost" data-act="auth-login">Уже есть аккаунт</button></div></div>';
     if (authMode === "reg") html += '<div class="card"><h1 class="serif h1">Создать дом</h1><label class="field">Gmail<input id="a-email" type="email"></label><label class="field">Имя<input id="a-name"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-reg">Получить письмо</button></div>';
     if (authMode === "join") html += '<div class="card"><h1 class="serif h1">Код дома</h1><label class="field">Gmail<input id="a-email" type="email"></label><label class="field">Имя<input id="a-name"></label><label class="field">Код<input id="a-code"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-join">Получить письмо</button></div>';
     if (authMode === "login") html += '<div class="card"><h1 class="serif h1">Войти</h1><label class="field">Почта<input id="a-email" type="email"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-login">Войти</button></div>';
@@ -116,30 +118,33 @@
     var p = bodyOf(); var t = targets(p); var eaten = eatenToday();
     var invite = meta().invite_code || home.inviteCode; var body = "";
     if (tab === "home") {
-      body += '<h1 class="serif h1">Сегодня</h1><p class="lede">Личные метрики и общий календарь.</p>';
+      body += '<h1 class="serif h1">Сегодня</h1><p class="lede">' + fmtLong(new Date()) + "</p>";
       body += '<div class="row" style="margin-bottom:12px">' + bar("Ккал", eaten.kcal, t && t.kcal, "#C97B5C") + bar("Белки", eaten.p, t && t.p, "#2B1810") + "</div>";
       body += '<div class="row" style="margin-bottom:12px">' + bar("Жиры", eaten.f, t && t.f, "#D4A24A") + bar("Углеводы", eaten.c, t && t.c, "#7A8F6A") + "</div>";
       body += '<div class="card">' + weekHTML() + "</div>";
     }
     if (tab === "parcels") {
-      body += '<div class="between"><h1 class="serif h1">Посылки</h1><button class="btn accent" data-act="add-parcel">Добавить</button></div><p class="lede">Общие карточки.</p>';
+      body += '<div class="between"><h1 class="serif h1">Посылки</h1><button class="btn accent" data-act="add-parcel">Добавить</button></div>';
       home.parcels.forEach(function (x) {
         body += '<div class="card"><div class="between"><strong>' + esc(x.title) + '</strong><span class="pill">' + (x.status==="done"?"Забрали":"В ПВЗ") + "</span></div>";
         body += '<label class="field">Код<input data-parcel="' + x.id + '" data-field="pickupCode" value="' + esc(x.pickupCode) + '"></label>';
-        body += '<label class="field">Адрес<input data-parcel="' + x.id + '" data-field="address" value="' + esc(x.address) + '"></label>';
-        if (x.status !== "done") body += '<button class="btn" data-act="done" data-id="' + x.id + '">Забрали</button>';
-        body += "</div>";
+        body += '<label class="field">Адрес<input data-parcel="' + x.id + '" data-field="address" value="' + esc(x.address) + '"></label></div>';
       });
     }
     if (tab === "menu") body += menuHTML();
     if (tab === "settings") {
       body += '<h1 class="serif h1">Настройки</h1><p class="lede">' + esc(user.email) + "</p>";
       body += '<div class="card"><div class="small">Код дома</div><div class="codebox serif">' + esc(invite) + "</div></div>";
-      body += '<div class="card"><h2 class="serif h2">Показания тела</h2><label class="field">Имя<input id="b-name" value="' + esc(p.name) + '"></label>';
-      body += '<div class="macros"><label class="field">Рост<input id="b-h" type="number" value="' + esc(p.heightCm) + '"></label><label class="field">Вес<input id="b-w" type="number" value="' + esc(p.weightKg) + '"></label><label class="field">Жир %<input id="b-f" type="number" value="' + esc(p.bodyFatPct) + '"></label><label class="field">Возраст<input id="b-a" type="number" value="' + esc(p.age) + '"></label></div>';
-      if (t) body += '<p class="small">Цель: ' + t.kcal + " ккал</p>";
-      body += '<button class="btn accent" data-act="save-body">Сохранить тело</button></div>';
-      body += '<div class="card"><h2 class="serif h2">Пароль</h2>';
+      body += '<div class="card"><h2 class="serif h2">Показания тела</h2>';
+      if (t) body += '<p class="small">Сейчас цель: ' + t.kcal + ' ккал · ' + ({cut:"похудение",bulk:"набор",maintain:"удержание"}[p.goal]||"удержание") + "</p>";
+      if (!showBody) body += '<button class="btn ghost" data-act="open-body">Изменить показания тела</button>';
+      else {
+        body += '<label class="field">Имя<input id="b-name" value="' + esc(p.name) + '"></label>';
+        body += '<div class="macros"><label class="field">Рост<input id="b-h" type="number" value="' + esc(p.heightCm) + '"></label><label class="field">Вес<input id="b-w" type="number" value="' + esc(p.weightKg) + '"></label><label class="field">Жир %<input id="b-f" type="number" value="' + esc(p.bodyFatPct) + '"></label><label class="field">Возраст<input id="b-a" type="number" value="' + esc(p.age) + '"></label></div>';
+        body += '<label class="field">Цель<select id="b-goal"><option value="cut"' + (p.goal==="cut"?" selected":"") + '>похудение (−20%)</option><option value="maintain"' + (p.goal==="maintain"?" selected":"") + '>удержание</option><option value="bulk"' + (p.goal==="bulk"?" selected":"") + '>набор (+15%)</option></select></label>';
+        body += '<button class="btn accent" data-act="save-body">Сохранить тело</button>';
+      }
+      body += "</div><div class=\"card\"><h2 class=\"serif h2\">Пароль</h2>";
       if (!showPass) body += '<button class="btn ghost" data-act="open-pass">Сменить пароль</button>';
       else body += '<label class="field">Новый пароль<input id="new-pass" type="password"></label><button class="btn accent" data-act="save-pass">Сохранить пароль</button>';
       body += '</div><button class="btn ghost" data-act="logout">Выйти</button>';
@@ -157,6 +162,7 @@
     if (act === "week") { weekStart = addDays(weekStart, Number(b.getAttribute("data-n"))); if (tab === "menu") menuDay = iso(weekStart); render(); }
     if (act === "menuday") { menuDay = b.getAttribute("data-d"); render(); }
     if (act === "open-pass") { showPass = true; render(); }
+    if (act === "open-body") { showBody = true; render(); }
     if (act === "do-reg") {
       var email = document.getElementById("a-email").value.trim();
       var name = document.getElementById("a-name").value.trim() || "Я";
@@ -188,8 +194,8 @@
       });
     }
     if (act === "save-body") {
-      sb.auth.updateUser({ data: { name: document.getElementById("b-name").value, heightCm: document.getElementById("b-h").value, weightKg: document.getElementById("b-w").value, bodyFatPct: document.getElementById("b-f").value, age: document.getElementById("b-a").value } }).then(function (res) {
-        if (res.error) alert(res.error.message); else { user = res.data.user; alert("Тело сохранено"); render(); }
+      sb.auth.updateUser({ data: { name: document.getElementById("b-name").value, heightCm: document.getElementById("b-h").value, weightKg: document.getElementById("b-w").value, bodyFatPct: document.getElementById("b-f").value, age: document.getElementById("b-a").value, goal: document.getElementById("b-goal").value } }).then(function (res) {
+        if (res.error) alert(res.error.message); else { user = res.data.user; showBody = false; alert("Тело сохранено"); render(); }
       });
     }
     if (act === "save-pass") {
@@ -199,7 +205,6 @@
     if (act === "logout") sb.auth.signOut().then(function () { user = null; authMode = "choose"; render(); });
     if (act === "add-event") { var title = prompt("Название"); var date = prompt("Дата", iso(new Date())); if (title && date) { home.events.push({ title: title, date: date, time: "" }); saveHome(); render(); } }
     if (act === "add-parcel") { var t2 = prompt("Посылка"); if (t2) { home.parcels.push({ id: String(Date.now()), source: "Вручную", title: t2, status: "transit", pickupCode: "", address: "" }); saveHome(); render(); } }
-    if (act === "done") { home.parcels = home.parcels.map(function (x) { return x.id === b.getAttribute("data-id") ? Object.assign({}, x, { status: "done" }) : x; }); saveHome(); render(); }
     if (act === "save-dish") {
       var dishEl = document.getElementById("dish"); if (!dishEl || !dishEl.value.trim()) return;
       home.meals.push({ date: menuDay, slot: "extra", title: dishEl.value.trim(), kcal: Number(document.getElementById("dkcal").value || 0), p: Number(document.getElementById("dp").value || 0), f: Number(document.getElementById("df").value || 0), c: Number(document.getElementById("dc").value || 0), eaten: true });
