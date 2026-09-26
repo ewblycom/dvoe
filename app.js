@@ -6,7 +6,7 @@
   var DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   var DAYFULL = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
   var MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-  var user = null, tab = "home", authMode = "choose", notice = "", showPass = false, showBody = false;
+  var user = null, tab = "home", authMode = "choose", notice = "", showPass = false, showBody = false, lastEmail = "";
   var weekStart = mondayOf(new Date());
   var menuDay = iso(new Date());
   function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
@@ -17,6 +17,13 @@
     var end = addDays(start, 6);
     return start.getDate() + " " + MONTHS[start.getMonth()] + " — " + end.getDate() + " " + MONTHS[end.getMonth()] + " " + end.getFullYear();
   }
+  function authMsg(msg) {
+    var m = String(msg || "");
+    if (/invalid login/i.test(m)) return "Неверный email или пароль. Регистрировались на ewblycom@icloud.com — введите именно её.";
+    if (/already registered|already been registered/i.test(m)) return "Этот email уже зарегистрирован. Нажмите «Уже есть аккаунт».";
+    if (/confirm/i.test(m)) return "Почта ещё не подтверждена.";
+    return m;
+  }
   function makeCode() { return "ДВОЕ-" + Math.random().toString(36).slice(2, 6).toUpperCase(); }
   function seedHome() {
     var mon = mondayOf(new Date());
@@ -25,11 +32,7 @@
       homeName: "Двое", inviteCode: makeCode(),
       events: [{ title: "Забрать Авито", date: "2026-09-21", time: "18:00" }, { title: "Ужин с родителями", date: d(2), time: "19:00" }],
       parcels: [{ id: "avito1", source: "Авито", title: "70000000518187074", status: "done", pickupCode: "в приложении Авито", address: "ПВЗ" }, { id: "five1", source: "5Post", title: "I-275035137", status: "pickup", pickupCode: "913423120", address: "Доблести 9с1" }],
-      meals: [
-        { date: iso(new Date()), slot: "breakfast", title: "Омлет", kcal: 320, p: 24, f: 20, c: 8, eaten: true },
-        { date: iso(new Date()), slot: "lunch", title: "Гречка с индейкой", kcal: 590, p: 42, f: 14, c: 64, eaten: true },
-        { date: d(0), slot: "dinner", title: "Рыба и салат", kcal: 470, p: 36, f: 18, c: 22, eaten: false }
-      ]
+      meals: [{ date: iso(new Date()), slot: "breakfast", title: "Омлет", kcal: 320, p: 24, f: 20, c: 8, eaten: true }, { date: iso(new Date()), slot: "lunch", title: "Гречка", kcal: 590, p: 42, f: 14, c: 64, eaten: true }]
     };
   }
   function loadHome() { try { var raw = localStorage.getItem(HOME); return raw ? Object.assign(seedHome(), JSON.parse(raw)) : seedHome(); } catch (e) { return seedHome(); } }
@@ -104,9 +107,9 @@
     var html = '<div class="app"><div class="hero"><div><div class="hero-kicker">дом на двоих</div><div class="hero-label serif">Двое</div></div></div><div class="main">';
     if (notice) html += '<div class="card"><p>' + esc(notice) + "</p></div>";
     if (authMode === "choose") html += '<div class="card"><h1 class="serif h1">Вход</h1><div class="row"><button class="btn accent" data-act="auth-reg">Создать дом</button><button class="btn ghost" data-act="auth-join">Есть код</button><button class="btn ghost" data-act="auth-login">Уже есть аккаунт</button></div></div>';
-    if (authMode === "reg") html += '<div class="card"><h1 class="serif h1">Создать дом</h1><label class="field">Gmail<input id="a-email" type="email"></label><label class="field">Имя<input id="a-name"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-reg">Получить письмо</button></div>';
-    if (authMode === "join") html += '<div class="card"><h1 class="serif h1">Код дома</h1><label class="field">Gmail<input id="a-email" type="email"></label><label class="field">Имя<input id="a-name"></label><label class="field">Код<input id="a-code"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-join">Получить письмо</button></div>';
-    if (authMode === "login") html += '<div class="card"><h1 class="serif h1">Войти</h1><label class="field">Почта<input id="a-email" type="email"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-login">Войти</button></div>';
+    if (authMode === "reg") html += '<div class="card"><h1 class="serif h1">Создать дом</h1><label class="field">Gmail<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-reg">Получить письмо</button></div>';
+    if (authMode === "join") html += '<div class="card"><h1 class="serif h1">Код дома</h1><label class="field">Gmail<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Код<input id="a-code"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-join">Получить письмо</button></div>';
+    if (authMode === "login") html += '<div class="card"><h1 class="serif h1">Войти</h1><p class="lede">Вход той же почтой, что при регистрации: ewblycom@icloud.com</p><label class="field">Почта<input id="a-email" type="email" value="' + esc(lastEmail || "ewblycom@icloud.com") + '"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-login">Войти</button></div>';
     html += "</div></div>"; return html;
   }
   function tabs() {
@@ -136,12 +139,12 @@
       body += '<h1 class="serif h1">Настройки</h1><p class="lede">' + esc(user.email) + "</p>";
       body += '<div class="card"><div class="small">Код дома</div><div class="codebox serif">' + esc(invite) + "</div></div>";
       body += '<div class="card"><h2 class="serif h2">Показания тела</h2>';
-      if (t) body += '<p class="small">Сейчас цель: ' + t.kcal + ' ккал · ' + ({cut:"похудение",bulk:"набор",maintain:"удержание"}[p.goal]||"удержание") + "</p>";
+      if (t) body += '<p class="small">Сейчас цель: ' + t.kcal + ' ккал</p>';
       if (!showBody) body += '<button class="btn ghost" data-act="open-body">Изменить показания тела</button>';
       else {
         body += '<label class="field">Имя<input id="b-name" value="' + esc(p.name) + '"></label>';
         body += '<div class="macros"><label class="field">Рост<input id="b-h" type="number" value="' + esc(p.heightCm) + '"></label><label class="field">Вес<input id="b-w" type="number" value="' + esc(p.weightKg) + '"></label><label class="field">Жир %<input id="b-f" type="number" value="' + esc(p.bodyFatPct) + '"></label><label class="field">Возраст<input id="b-a" type="number" value="' + esc(p.age) + '"></label></div>';
-        body += '<label class="field">Цель<select id="b-goal"><option value="cut"' + (p.goal==="cut"?" selected":"") + '>похудение (−20%)</option><option value="maintain"' + (p.goal==="maintain"?" selected":"") + '>удержание</option><option value="bulk"' + (p.goal==="bulk"?" selected":"") + '>набор (+15%)</option></select></label>';
+        body += '<label class="field">Цель<select id="b-goal"><option value="cut"' + (p.goal==="cut"?" selected":"") + '>похудение</option><option value="maintain"' + (p.goal==="maintain"?" selected":"") + '>удержание</option><option value="bulk"' + (p.goal==="bulk"?" selected":"") + '>набор</option></select></label>';
         body += '<button class="btn accent" data-act="save-body">Сохранить тело</button>';
       }
       body += "</div><div class=\"card\"><h2 class=\"serif h2\">Пароль</h2>";
@@ -164,32 +167,33 @@
     if (act === "open-pass") { showPass = true; render(); }
     if (act === "open-body") { showBody = true; render(); }
     if (act === "do-reg") {
-      var email = document.getElementById("a-email").value.trim();
+      var email = document.getElementById("a-email").value.trim(); lastEmail = email;
       var name = document.getElementById("a-name").value.trim() || "Я";
       var pass = document.getElementById("a-pass").value;
       if (!email || !pass) return alert("Почта и пароль");
       var invite = makeCode();
       sb.auth.signUp({ email: email, password: pass, options: { emailRedirectTo: redirectTo(), data: { name: name, invite_code: invite, role: "owner" } } }).then(function (res) {
-        if (res.error) { notice = res.error.message; render(); return; }
+        if (res.error) { notice = authMsg(res.error.message); render(); return; }
         home.inviteCode = invite; saveHome();
         if (res.data.session) { user = res.data.user; render(); } else { notice = "Письмо отправлено на " + email; authMode = "login"; render(); }
       });
     }
     if (act === "do-join") {
-      var email2 = document.getElementById("a-email").value.trim();
+      var email2 = document.getElementById("a-email").value.trim(); lastEmail = email2;
       var name2 = document.getElementById("a-name").value.trim() || "Я";
       var codeIn = document.getElementById("a-code").value.trim().toUpperCase();
       var pass2 = document.getElementById("a-pass").value;
       if (!email2 || !pass2 || !codeIn) return alert("Заполните поля");
       sb.auth.signUp({ email: email2, password: pass2, options: { emailRedirectTo: redirectTo(), data: { name: name2, invite_code: codeIn, role: "member" } } }).then(function (res) {
-        if (res.error) { notice = res.error.message; render(); return; }
+        if (res.error) { notice = authMsg(res.error.message); render(); return; }
         home.inviteCode = codeIn; saveHome();
         if (res.data.session) { user = res.data.user; render(); } else { notice = "Письмо отправлено на " + email2; authMode = "login"; render(); }
       });
     }
     if (act === "do-login") {
-      sb.auth.signInWithPassword({ email: document.getElementById("a-email").value.trim(), password: document.getElementById("a-pass").value }).then(function (res) {
-        if (res.error) { notice = res.error.message; render(); return; }
+      lastEmail = document.getElementById("a-email").value.trim();
+      sb.auth.signInWithPassword({ email: lastEmail, password: document.getElementById("a-pass").value }).then(function (res) {
+        if (res.error) { notice = authMsg(res.error.message); render(); return; }
         user = res.data.user; render();
       });
     }
