@@ -19,9 +19,8 @@
   }
   function authMsg(msg) {
     var m = String(msg || "");
-    if (/invalid login/i.test(m)) return "Неверный email или пароль. Регистрировались на ewblycom@icloud.com — введите именно её.";
+    if (/invalid login/i.test(m)) return "Неверный email или пароль. Регистрировались на ewblycom@icloud.com.";
     if (/already registered|already been registered/i.test(m)) return "Этот email уже зарегистрирован. Нажмите «Уже есть аккаунт».";
-    if (/confirm/i.test(m)) return "Почта ещё не подтверждена.";
     return m;
   }
   function makeCode() { return "ДВОЕ-" + Math.random().toString(36).slice(2, 6).toUpperCase(); }
@@ -106,10 +105,12 @@
   function authHTML() {
     var html = '<div class="app"><div class="hero"><div><div class="hero-kicker">дом на двоих</div><div class="hero-label serif">Двое</div></div></div><div class="main">';
     if (notice) html += '<div class="card"><p>' + esc(notice) + "</p></div>";
+    if (authMode !== "choose") html += '<p style="margin-bottom:10px"><button class="btn ghost" data-act="auth-back">Назад</button></p>';
     if (authMode === "choose") html += '<div class="card"><h1 class="serif h1">Вход</h1><div class="row"><button class="btn accent" data-act="auth-reg">Создать дом</button><button class="btn ghost" data-act="auth-join">Есть код</button><button class="btn ghost" data-act="auth-login">Уже есть аккаунт</button></div></div>';
-    if (authMode === "reg") html += '<div class="card"><h1 class="serif h1">Создать дом</h1><label class="field">Gmail<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-reg">Получить письмо</button></div>';
-    if (authMode === "join") html += '<div class="card"><h1 class="serif h1">Код дома</h1><label class="field">Gmail<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Код<input id="a-code"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-join">Получить письмо</button></div>';
-    if (authMode === "login") html += '<div class="card"><h1 class="serif h1">Войти</h1><p class="lede">Вход той же почтой, что при регистрации: ewblycom@icloud.com</p><label class="field">Почта<input id="a-email" type="email" value="' + esc(lastEmail || "ewblycom@icloud.com") + '"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-login">Войти</button></div>';
+    if (authMode === "reg") html += '<div class="card"><h1 class="serif h1">Создать дом</h1><label class="field">Почта<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-reg">Получить письмо</button></div>';
+    if (authMode === "join") html += '<div class="card"><h1 class="serif h1">Код дома</h1><label class="field">Почта<input id="a-email" type="email" value="' + esc(lastEmail) + '"></label><label class="field">Имя<input id="a-name"></label><label class="field">Код<input id="a-code"></label><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-join">Получить письмо</button></div>';
+    if (authMode === "login") html += '<div class="card"><h1 class="serif h1">Войти</h1><p class="lede">Почта регистрации: ewblycom@icloud.com</p><label class="field">Почта<input id="a-email" type="email" value="' + esc(lastEmail || "ewblycom@icloud.com") + '"></label><label class="field">Пароль<input id="a-pass" type="password"></label><div class="row"><button class="btn accent" data-act="do-login">Войти</button><button class="btn ghost" data-act="forgot">Забыли пароль</button></div></div>';
+    if (authMode === "recover") html += '<div class="card"><h1 class="serif h1">Новый пароль</h1><label class="field">Пароль<input id="a-pass" type="password"></label><button class="btn accent" data-act="do-recover">Сохранить пароль</button></div>';
     html += "</div></div>"; return html;
   }
   function tabs() {
@@ -117,7 +118,8 @@
   }
   function render() {
     var root = document.getElementById("app");
-    if (!user) { root.innerHTML = authHTML(); return; }
+    if (!user && authMode !== "recover") { root.innerHTML = authHTML(); return; }
+    if (authMode === "recover") { root.innerHTML = authHTML(); return; }
     var p = bodyOf(); var t = targets(p); var eaten = eatenToday();
     var invite = meta().invite_code || home.inviteCode; var body = "";
     if (tab === "home") {
@@ -161,6 +163,22 @@
     if (act === "auth-reg") { authMode = "reg"; render(); }
     if (act === "auth-join") { authMode = "join"; render(); }
     if (act === "auth-login") { authMode = "login"; render(); }
+    if (act === "auth-back") { authMode = "choose"; notice = ""; render(); }
+    if (act === "forgot") {
+      lastEmail = (document.getElementById("a-email") && document.getElementById("a-email").value.trim()) || lastEmail || "ewblycom@icloud.com";
+      sb.auth.resetPasswordForEmail(lastEmail, { redirectTo: redirectTo() }).then(function (res) {
+        notice = res.error ? authMsg(res.error.message) : ("Письмо для смены пароля отправлено на " + lastEmail);
+        render();
+      });
+    }
+    if (act === "do-recover") {
+      var npw = document.getElementById("a-pass").value;
+      if (!npw) return alert("Введите пароль");
+      sb.auth.updateUser({ password: npw }).then(function (res) {
+        if (res.error) { notice = authMsg(res.error.message); render(); return; }
+        user = res.data.user || user; authMode = "choose"; notice = "Пароль обновлён"; render();
+      });
+    }
     if (act === "tab") { tab = b.getAttribute("data-v"); render(); }
     if (act === "week") { weekStart = addDays(weekStart, Number(b.getAttribute("data-n"))); if (tab === "menu") menuDay = iso(weekStart); render(); }
     if (act === "menuday") { menuDay = b.getAttribute("data-d"); render(); }
@@ -222,5 +240,12 @@
       if (px) { px[el.getAttribute("data-field")] = el.value; saveHome(); }
     }
   });
-  sb.auth.getSession().then(function (res) { user = res.data.session ? res.data.session.user : null; render(); }).catch(function (err) { document.getElementById("app").textContent = "Ошибка: " + err.message; });
+  sb.auth.onAuthStateChange(function (event, session) {
+    if (event === "PASSWORD_RECOVERY") { user = session && session.user; authMode = "recover"; render(); }
+  });
+  sb.auth.getSession().then(function (res) {
+    user = res.data.session ? res.data.session.user : null;
+    if (location.hash.indexOf("type=recovery") !== -1) authMode = "recover";
+    render();
+  }).catch(function (err) { document.getElementById("app").textContent = "Ошибка: " + err.message; });
 })();
