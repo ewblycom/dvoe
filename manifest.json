@@ -3,8 +3,8 @@
   "short_name": "Двое",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#F4E9D8",
-  "theme_color": "#2B1810",
+  "background_color": "#F7F5F2",
+  "theme_color": "#F7F5F2",
   "lang": "ru",
   "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }
